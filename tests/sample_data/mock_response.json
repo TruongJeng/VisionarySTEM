@@ -1,0 +1,102 @@
+{
+  "document_metadata": {
+    "filename": "newton_law_sample.pdf",
+    "total_pages": 1,
+    "processing_time_ms": 1000,
+    "model_used": "gemini-1.5-pro (mock)"
+  },
+  "content_blocks": [
+    {
+      "id": "block_001",
+      "type": "text",
+      "raw_content": "Định luật II Newton về chuyển động",
+      "latex": null,
+      "spoken_text": "Định luật hai Niu-tơn về chuyển động.",
+      "language": "vi",
+      "confidence": 0.97,
+      "coordinates": {
+        "page": 1,
+        "x": 10,
+        "y": 5,
+        "w": 80,
+        "h": 8,
+        "region": "top-center"
+      }
+    },
+    {
+      "id": "block_002",
+      "type": "text",
+      "raw_content": "Nội dung: Gia tốc của một vật tỉ lệ thuận với lực tác dụng lên nó và tỉ lệ nghịch với khối lượng của nó.",
+      "latex": null,
+      "spoken_text": "Nội dung: Gia tốc của một vật tỉ lệ thuận với lực tác dụng lên nó và tỉ lệ nghịch với khối lượng của nó.",
+      "language": "vi",
+      "confidence": 0.95,
+      "coordinates": {
+        "page": 1,
+        "x": 10,
+        "y": 15,
+        "w": 80,
+        "h": 10,
+        "region": "top-center"
+      }
+    },
+    {
+      "id": "block_003",
+      "type": "math",
+      "raw_content": "F = ma",
+      "latex": "F = ma",
+      "spoken_text": "Lực bằng khối lượng nhân gia tốc.",
+      "language": "vi",
+      "confidence": 0.99,
+      "coordinates": {
+        "page": 1,
+        "x": 35,
+        "y": 30,
+        "w": 30,
+        "h": 8,
+        "region": "center"
+      }
+    },
+    {
+      "id": "block_004",
+      "type": "math",
+      "raw_content": "a = F/m",
+      "latex": "a = \\frac{F}{m}",
+      "spoken_text": "Gia tốc bằng lực chia cho khối lượng.",
+      "language": "vi",
+      "confidence": 0.98,
+      "coordinates": {
+        "page": 1,
+        "x": 35,
+        "y": 42,
+        "w": 30,
+        "h": 8,
+        "region": "center"
+      }
+    },
+    {
+      "id": "block_005",
+      "type": "chart",
+      "raw_content": "[Biểu đồ đường thẳng: Trục X - Gia tốc (m/s²), Trục Y - Lực (N)]",
+      "latex": null,
+      "spoken_text": "Biểu đồ đường thẳng thể hiện mối quan hệ tỉ lệ thuận giữa lực và gia tốc. Trục hoành là gia tốc tính bằng mét trên giây bình phương, trục tung là lực tính bằng Niu-tơn. Đường thẳng đi qua gốc tọa độ cho thấy khi gia tốc tăng thì lực cũng tăng tương ứng.",
+      "language": "vi",
+      "confidence": 0.92,
+      "coordinates": {
+        "page": 1,
+        "x": 15,
+        "y": 55,
+        "w": 70,
+        "h": 35,
+        "region": "bottom-center"
+      }
+    }
+  ],
+  "spatial_index": {
+    "regions": {
+      "top-center": ["block_001", "block_002"],
+      "center": ["block_003", "block_004"],
+      "bottom-center": ["block_005"]
+    }
+  }
+}

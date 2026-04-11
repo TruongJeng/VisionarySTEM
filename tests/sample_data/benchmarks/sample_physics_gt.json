@@ -1,0 +1,22 @@
+[
+    {
+        "id": "gt_001",
+        "type": "text",
+        "spoken_text": "\u0110\u1ecbnh lu\u1eadt II Niu-t\u01a1n v\u1ec1 chuy\u1ec3n \u0111\u1ed9ng."
+    },
+    {
+        "id": "gt_002",
+        "type": "text",
+        "spoken_text": "Gia t\u1ed1c c\u1ee7a m\u1ed9t v\u1eadt t\u1ec9 l\u1ec7 thu\u1eadn v\u1edbi l\u1ef1c t\u00e1c d\u1ee5ng l\u00ean n\u00f3 v\u00e0 t\u1ec9 l\u1ec7 ngh\u1ecbch v\u1edbi kh\u1ed1i l\u01b0\u1ee3ng c\u1ee7a n\u00f3."
+    },
+    {
+        "id": "gt_003",
+        "type": "math",
+        "spoken_text": "L\u1ef1c b\u1eb1ng kh\u1ed1i l\u01b0\u1ee3ng nh\u00e2n gia t\u1ed1c."
+    },
+    {
+        "id": "gt_004",
+        "type": "math",
+        "spoken_text": "Gia t\u1ed1c b\u1eb1ng l\u1ef1c chia cho kh\u1ed1i l\u01b0\u1ee3ng."
+    }
+]
