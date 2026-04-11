@@ -59,12 +59,13 @@ def _convert_gemini_to_schema(gemini_blocks, page_override: int = None) -> list[
     """
     result = []
     for gb in gemini_blocks:
+        # Clamp coordinates to 0-100 range (AI sometimes returns values slightly out of bounds)
         coords = Coordinates(
             page=page_override or gb.coordinates.page,
-            x=gb.coordinates.x,
-            y=gb.coordinates.y,
-            w=gb.coordinates.w,
-            h=gb.coordinates.h,
+            x=max(0.0, min(100.0, gb.coordinates.x)),
+            y=max(0.0, min(100.0, gb.coordinates.y)),
+            w=max(0.0, min(100.0, gb.coordinates.w)),
+            h=max(0.0, min(100.0, gb.coordinates.h)),
             region=gb.coordinates.region,
         )
         block = ContentBlock(

@@ -189,10 +189,13 @@ async def analyze_document(file: UploadFile = File(...)):
             detail=f"Analysis failed: {str(e)}"
         )
     finally:
-        # Cleanup temp file
-        if temp_path.exists():
-            temp_path.unlink()
-            logger.info(f"Temp file cleaned up: {temp_path}")
+        # Cleanup temp file (Windows-safe: file may still be locked by another process)
+        try:
+            if temp_path.exists():
+                temp_path.unlink(missing_ok=True)
+                logger.info(f"Temp file cleaned up: {temp_path}")
+        except PermissionError:
+            logger.warning(f"Could not delete temp file (still locked): {temp_path}")
 
 
 # ============================================
