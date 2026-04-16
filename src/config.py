@@ -59,6 +59,11 @@ MAX_FILE_SIZE_BYTES: int = MAX_FILE_SIZE_MB * 1024 * 1024
 TTS_VOICE: str = os.getenv("TTS_VOICE", "vi-VN-HoaiMyNeural")
 
 # ============================================
+# Database Settings
+# ============================================
+MYSQL_URL: str = os.getenv("MYSQL_URL", "mysql+pymysql://root:@localhost:3306/visionary_stem")
+
+# ============================================
 # Paths
 # ============================================
 UPLOAD_DIR: Path = _PROJECT_ROOT / "uploads"

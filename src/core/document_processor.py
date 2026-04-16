@@ -115,43 +115,44 @@ def analyze_file(file_path: str, filename: str = None) -> DocumentAnalysisRespon
     
     # Unified pipeline for both PDF and Images using PyMuPDF
     doc = fitz.open(str(file_path))
-    for page_num in range(total_pages):
-        logger.info(f"📄 Analyzing page {page_num + 1}/{total_pages}...")
-        page = doc[page_num]
-        
-        # Render page to image (max 1500px to optimize latency)
-        zoom = 1500.0 / max(page.rect.width, page.rect.height)
-        if zoom > 2.5: 
-            zoom = 2.5 # don't blow up small pages
+    try:
+        for page_num in range(total_pages):
+            logger.info(f"📄 Analyzing page {page_num + 1}/{total_pages}...")
+            page = doc[page_num]
             
-        mat = fitz.Matrix(zoom, zoom)
-        pix = page.get_pixmap(matrix=mat)
-        
-        # Compress as JPEG (quality 85) to reduce payload size
-        # This cuts size from ~3MB (PNG 300DPI) to ~200KB, speeding up Gemini request
-        img_bytes = pix.tobytes("jpeg", jpg_quality=85)
-        
-        logger.info(f"🖼️ Compressed image size: {len(img_bytes) // 1024} KB")
-        
-        gemini_result = engine.analyze_image_bytes(
-            image_bytes=img_bytes,
-            mime_type="image/jpeg",
-            page_number=page_num + 1,
-        )
-        
-        page_blocks = _convert_gemini_to_schema(
-            gemini_result.content_blocks,
-            page_override=page_num + 1,
-        )
-        
-        # Re-number block IDs to be globally unique
-        for i, block in enumerate(page_blocks):
-            global_idx = len(all_blocks) + i + 1
-            block.id = f"block_{global_idx:03d}"
-        
-        all_blocks.extend(page_blocks)
-    
-    doc.close()
+            # Render page to image (max 1500px to optimize latency)
+            zoom = 1500.0 / max(page.rect.width, page.rect.height)
+            if zoom > 2.5: 
+                zoom = 2.5 # don't blow up small pages
+                
+            mat = fitz.Matrix(zoom, zoom)
+            pix = page.get_pixmap(matrix=mat)
+            
+            # Compress as JPEG (quality 85) to reduce payload size
+            # This cuts size from ~3MB (PNG 300DPI) to ~200KB, speeding up Gemini request
+            img_bytes = pix.tobytes("jpeg", jpg_quality=85)
+            
+            logger.info(f"🖼️ Compressed image size: {len(img_bytes) // 1024} KB")
+            
+            gemini_result = engine.analyze_image_bytes(
+                image_bytes=img_bytes,
+                mime_type="image/jpeg",
+                page_number=page_num + 1,
+            )
+            
+            page_blocks = _convert_gemini_to_schema(
+                gemini_result.content_blocks,
+                page_override=page_num + 1,
+            )
+            
+            # Re-number block IDs to be globally unique
+            for i, block in enumerate(page_blocks):
+                global_idx = len(all_blocks) + i + 1
+                block.id = f"block_{global_idx:03d}"
+            
+            all_blocks.extend(page_blocks)
+    finally:
+        doc.close()
     
     # Calculate processing time
     processing_time_ms = int((time.time() - start_time) * 1000)

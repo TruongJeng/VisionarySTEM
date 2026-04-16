@@ -10,10 +10,13 @@ Cung cấp endpoint phân tích tài liệu, truy vấn không gian, âm thanh T
 
 import uuid
 import logging
+import json
 from pathlib import Path
+from datetime import datetime, timezone
 
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
 from fastapi.responses import FileResponse
 
 from src.config import GEMINI_MODEL, MAX_FILE_SIZE_BYTES, UPLOAD_DIR, OUTPUT_DIR, print_config_summary
@@ -177,26 +180,171 @@ async def analyze_document(file: UploadFile = File(...)):
         _last_analysis["response"] = result
 
         logger.info(f"Indexed into Spatial RAG: doc_id={doc_id}")
+        
+        # Save JSON to disk for future use
+        json_path = temp_path.with_suffix(temp_path.suffix + '.json')
+        result_json = result.model_dump_json(indent=2) if hasattr(result, "model_dump_json") else result.json(indent=2)
+        with open(json_path, "w", encoding="utf-8") as f:
+            f.write(result_json)
 
         return result
 
     except HTTPException:
+        # Only cleanup if error occurred
+        if temp_path.exists():
+            temp_path.unlink(missing_ok=True)
         raise
     except Exception as e:
         logger.error(f"Analysis failed: {e}", exc_info=True)
+        try:
+            if temp_path.exists():
+                temp_path.unlink(missing_ok=True)
+        except Exception as cleanup_err:
+            logger.error(f"Cleanup failed: {cleanup_err}")
+            
         raise HTTPException(
             status_code=500,
             detail=f"Analysis failed: {str(e)}"
         )
-    finally:
-        # Cleanup temp file (Windows-safe: file may still be locked by another process)
-        try:
-            if temp_path.exists():
-                temp_path.unlink(missing_ok=True)
-                logger.info(f"Temp file cleaned up: {temp_path}")
-        except PermissionError:
-            logger.warning(f"Could not delete temp file (still locked): {temp_path}")
 
+
+# ============================================
+# DOCUMENTS ENDPOINTS
+# ============================================
+
+class DocumentItem(BaseModel):
+    id: str
+    filename: str
+    file_path: str
+    created_at: str
+    size_bytes: int
+    total_pages: int
+    processing_time_ms: int
+    url: str
+
+@app.get(
+    "/api/v1/documents",
+    response_model=list[DocumentItem],
+    summary="List uploaded documents / Danh sach tai lieu",
+    tags=["Documents"],
+)
+async def list_documents():
+    """List all analyzed documents in uploads directory (filesystem-based)."""
+    docs = []
+    if not UPLOAD_DIR.exists():
+        return docs
+
+    for fp in UPLOAD_DIR.iterdir():
+        if fp.is_file() and fp.suffix.lower() in ALLOWED_EXTENSIONS:
+            json_path = fp.with_suffix(fp.suffix + '.json')
+            if json_path.exists():
+                try:
+                    stat = fp.stat()
+                    # Try to read metadata from the JSON
+                    total_pages = 0
+                    processing_time_ms = 0
+                    try:
+                        with open(json_path, "r", encoding="utf-8") as jf:
+                            analysis = json.load(jf)
+                            meta = analysis.get("document_metadata", {})
+                            total_pages = meta.get("total_pages", 0)
+                            processing_time_ms = meta.get("processing_time_ms", 0)
+                    except Exception:
+                        pass
+
+                    docs.append(DocumentItem(
+                        id=fp.name.split('_', 1)[0] if '_' in fp.name else fp.stem,
+                        filename=fp.name.split('_', 1)[-1] if '_' in fp.name else fp.name,
+                        file_path=fp.name,
+                        created_at=datetime.fromtimestamp(stat.st_ctime, tz=timezone.utc).isoformat(),
+                        size_bytes=stat.st_size,
+                        total_pages=total_pages,
+                        processing_time_ms=processing_time_ms,
+                        url=f"/api/v1/documents/{fp.name}"
+                    ))
+                except Exception:
+                    pass
+
+    docs.sort(key=lambda x: x.created_at, reverse=True)
+    return docs
+
+@app.get(
+    "/api/v1/documents/{filename}",
+    summary="Get Document File Content / Lay noi dung file",
+    tags=["Documents"],
+)
+async def get_document_file(filename: str):
+    file_path = UPLOAD_DIR / filename
+    if not file_path.exists() or not file_path.is_file():
+        raise HTTPException(status_code=404, detail="File not found")
+    return FileResponse(path=file_path)
+
+@app.get(
+    "/api/v1/documents/{filename}",
+    summary="Get Document File Content / Lay noi dung file",
+    tags=["Documents"],
+)
+async def get_document_file(filename: str):
+    file_path = UPLOAD_DIR / filename
+    if not file_path.exists() or not file_path.is_file():
+        raise HTTPException(status_code=404, detail="File not found")
+    return FileResponse(path=file_path)
+
+@app.get(
+    "/api/v1/documents/{filename}/analysis",
+    response_model=DocumentAnalysisResponse,
+    summary="Get Document Analysis JSON / Lay json phan tich",
+    tags=["Documents"],
+)
+async def get_document_analysis(filename: str):
+    """Load analysis JSON for a document from disk."""
+    json_path = UPLOAD_DIR / f"{filename}.json"
+    if not json_path.exists() or not json_path.is_file():
+        raise HTTPException(status_code=404, detail="Analysis JSON not found")
+
+    with open(json_path, "r", encoding="utf-8") as f:
+        data = json.load(f)
+
+    doc_id = filename.split('_', 1)[0] if '_' in filename else filename
+    try:
+        result = DocumentAnalysisResponse.model_validate(data)
+
+        # update last analysis reference
+        _last_analysis["document_id"] = doc_id
+        _last_analysis["response"] = result
+
+        # Also index into Spatial RAG so queries work!
+        rag_engine = get_rag_engine()
+        rag_engine.index_document(doc_id, result.content_blocks)
+
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to parse analysis JSON: {str(e)}")
+
+@app.delete(
+    "/api/v1/documents/{filename}",
+    summary="Delete Document / Xoa tai lieu",
+    tags=["Documents"],
+)
+async def delete_document(filename: str):
+    """Delete a document file and its analysis JSON from disk."""
+    file_path = UPLOAD_DIR / filename
+    json_path = UPLOAD_DIR / f"{filename}.json"
+    
+    deleted = False
+    try:
+        if file_path.exists():
+            file_path.unlink()
+            deleted = True
+        if json_path.exists():
+            json_path.unlink()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to delete file: {e}")
+
+    if not deleted:
+        raise HTTPException(status_code=404, detail="File not found")
+        
+    return {"status": "ok", "message": f"Deleted {filename}"}
 
 # ============================================
 # SPATIAL QUERY ENDPOINTS
@@ -236,6 +384,47 @@ async def spatial_query(request: SpatialQueryRequest):
     )
 
     return result
+
+
+# ============================================
+# SMART ACTION ENDPOINT
+# ============================================
+
+class SmartActionRequest(BaseModel):
+    prompt: str
+
+class SmartActionResponse(BaseModel):
+    answer: str
+
+@app.post(
+    "/api/v1/smart_action",
+    response_model=SmartActionResponse,
+    summary="Smart Action / Hanh dong thong minh",
+    tags=["Smart Action"],
+)
+async def smart_action(request: SmartActionRequest):
+    """
+    Process a smart action (explain, translate, summarize) using Gemini directly.
+    """
+    try:
+        from src.core.gemini_engine import get_engine
+        engine = get_engine()
+        response = engine.client.models.generate_content(
+            model=engine.model,
+            contents=[request.prompt],
+        )
+        # Filter out system tags or layout tags if any
+        answer_text = response.text
+        # Remove any obvious hallucinated artifacts
+        import re
+        answer_text = re.sub(r"POST \d+ ROW \d+", "", answer_text)
+        
+        return SmartActionResponse(answer=answer_text)
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Smart Action failed: {str(e)}"
+        )
 
 
 # ============================================
